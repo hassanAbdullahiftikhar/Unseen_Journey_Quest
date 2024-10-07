@@ -4,13 +4,21 @@
 using namespace std;
 
 int main() {
-    initscr();          // Start curses mode
-    start_color();      // Start color functionality
+    initscr();          
+    start_color();      
     init_pair(1, COLOR_GREEN, COLOR_BLACK);
-    keypad(stdscr, TRUE); // Enable function keys and arrow keys
-    srand(time(0));
+    keypad(stdscr, TRUE); 
+    srand(time(0));     
     Grid g(10);
+    player p(10);
+    key k(10);
+    door d(10);
+    p.place_object(g.get_firstN());
+    k.place_object(g.get_firstN());
+    d.place_object(g.get_firstN());
     g.print_grid();
-    endwin();
+    getch();
+
+    endwin();           
     return 0;
 }
