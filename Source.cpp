@@ -4,21 +4,13 @@
 using namespace std;
 
 int main() {
-    initscr();          
+    initscr();         
     start_color();      
     init_pair(1, COLOR_GREEN, COLOR_BLACK);
-    keypad(stdscr, TRUE); 
-    srand(time(0));     
-    Grid g(10);
-    player p(10);
-    key k(10);
-    door d(10);
-    p.place_object(g.get_firstN());
-    k.place_object(g.get_firstN());
-    d.place_object(g.get_firstN());
-    g.print_grid();
-    getch();
+    keypad(stdscr, TRUE);
+    srand(time(0));
+    game g1;            //game object
+    g1.game_setup(15);  //initialize grid and other objects and start the game
 
-    endwin();           
     return 0;
 }
