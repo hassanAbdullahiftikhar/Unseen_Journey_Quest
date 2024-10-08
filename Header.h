@@ -95,6 +95,7 @@ public:
 		c->c = 'P';
 	}
 };
+
 class key :public object {
 public:
 	key(int s) :object(s) {}
@@ -123,7 +124,7 @@ public:
 		c->c = 'D';
 	}
 };
-class bomb :public object {
+struct bomb :public object {
 public:
 	bomb(int s) :object(s) {}
 	void place_object(Node*& f) {
@@ -135,6 +136,131 @@ public:
 			c = c->down;
 		}
 		c->c = 'B';
+	}
+};
+struct coin :public object {
+	coin* nextc;
+	void unique(key k, door d, player p,bomb b, Node*& f) {
+		while ((k.get_x() == x && k.get_y() == y) || 
+			(d.get_x() == x && d.get_y()==y) ||
+			(p.get_x() == x && p.get_y()== y)||
+			(b.get_x() == x && b.get_y() == y)) {
+			x = rand() % (si - 1);
+			y = rand() % (si - 1);
+		}
+
+	}
+public:
+	coin(int s, key k, door d, player p,bomb b, Node*& f) :object(s) {
+		nextc = nullptr;
+		unique(k, d, p, b,f);
+	}
+	void place_object(Node*& f) {
+		Node* c = f;
+		for (int i = 0; i < x; i++) {
+			c = c->right;
+		}
+		for (int i = 0; i < y; i++) {
+			c = c->down;
+		}
+		c->c = 'C';
+	}
+};
+class coin_list {
+	coin* h;
+	int c = 0;
+public:
+	coin_list(int s, key k, door d, player p,bomb b, Node*& f) {
+		if (s == 10) {
+			c = 3;
+		}
+		else if (s == 15) {
+			c = 5;
+		}
+		else if (s == 20) {
+			c == 6;
+		}
+		h = new coin(s,k,d,p,b,f);
+		coin* curr = h;
+		for (int i = 1; i < c; i++) {
+			curr->nextc = new coin(s, k, d, p,b, f);
+			curr = curr->nextc;
+		}
+	}
+	void rem_prev(Node*& f) {
+		Node* g = f;
+		Node* c = g;
+		coin* cur = h;
+		while (cur!=nullptr) {
+			for (int i = 0; i < cur->get_x();i++) {
+				c = c->right;
+			}
+			for (int i = 0; i < cur->get_y(); i++) {
+				c = c->down;
+			}
+			c->c = '.';
+			cur = cur->nextc;
+		}
+	}
+	bool rem(int xp,int yp,Node*&f) {
+		coin* cur = h;
+		Node* g = f;
+		while (cur != nullptr) {
+			if (h->get_x() == xp && h->get_y() == yp) {
+				for (int i = 0; i <= xp; i++) {
+					g = g->right;
+				}
+				for (int i = 0; i <= yp; i++) {
+					g = g->down;
+				}
+				g->c = '.';
+				h = h->nextc;
+				delete cur;
+				return true;
+			}
+			else if (cur->nextc!=nullptr &&
+				cur->nextc->get_x() == xp && cur->nextc->get_y() == yp) {
+				coin* temp = cur->nextc;
+				cur->nextc = cur->nextc->nextc;
+				delete temp;
+				return true;
+			}
+			cur = cur->nextc;
+		}
+		return false;
+	}
+	void update_c(int s,key k, door d, player p,bomb b, Node*& f) {
+		coin* th = h;
+		Node* cur = f;
+		while (th != nullptr) {
+			coin* temp = th;
+			for (int i = 0; i < temp->get_x(); i++) {
+				cur = cur->right;
+			}
+			for (int i = 0; i < temp->get_y(); i++) {
+				cur = cur->down;
+			}
+			cur->c = '.';
+			cur = f;
+			th = th->nextc;
+			delete temp;
+		}
+		h = new coin(s, k, d, p,b, f);
+		coin* curr = h;
+		for (int i = 1; i < c; i++) {
+			curr->nextc = new coin(s, k, d, p, b,f);
+			curr = curr->nextc;
+		}
+	}
+	coin*& get_head() {
+		return h;
+	}
+	void place_coins(Node*& f) {
+		coin* cu = h;
+		for (int i = 0; i < c; i++) {
+			cu->place_object(f);
+			cu = cu->nextc;
+		}
 	}
 };
 class Grid {
@@ -193,7 +319,7 @@ public:
 			r = r->down;
 			curr = r;
 		}
-		//print_grid();
+		print_grid();
 	}
 	Node*& get_firstN() {
 		return t_row;
@@ -218,18 +344,10 @@ public:
 			for (int j = 0; j < 2 * 15 + 2; j++) {
 				if (i == 0 || i == s + 1) {
 					mvprintw(i, j, "#");
-					if (i == s + 1) {
-						clrtoeol();
-					}
 				}
 				if (j == 0 || j == 2 * s + 1) {
 					mvprintw(i, j, "#");
 				}
-			}
-		}
-		for (int i = 0; i < s + 2; i++) {
-			for (int j = 2 * s + 2; j < 5000; j++) {
-				mvaddch(i, j, ' ');
 			}
 		}
 		refresh();
@@ -241,6 +359,7 @@ class game {
 	key* k;
 	bomb* b;
 	door* d;
+	coin_list* c;
 	int pad = 0;
 	bool hint = false, first_t = true;
 	int t, ctime;
@@ -327,13 +446,14 @@ class game {
 		int counter = 20;
 		location *g = p->get_Pstack().t();
 		location* bn = g;
-		while (bn != nullptr) {
+		coin* ct = c->get_head();
+		while (ct != nullptr) {
 			mvprintw(19, 0, "NAughty");
-			mvprintw(counter, 0, "%d", bn->x);
-			mvprintw(counter, 1, "%d", bn->y);
-			bn = bn->next;
+			mvprintw(counter, 0, "%d", ct->get_x());
+			mvprintw(counter, 1, "%d", ct->get_y());
+			ct = ct->nextc;
 			counter++;
-			refresh();
+			//refresh();
 		}
 		if (p->get_key() == false) {
 			mvprintw(h->get_size() + 3, 0 + pad, "Key Status: False");
@@ -391,6 +511,7 @@ public:
 		k = new key(s);
 		b = new bomb(s);
 		d = new door(s);
+		c = new coin_list(s,*k,*d,*p,*b,h->get_firstN());
 		t = 15;
 		ctime = time(0);
 		srand((time(0)));
@@ -399,11 +520,17 @@ public:
 		k->place_object(h->get_firstN());//placing key
 		b->place_object(h->get_firstN());//placing bomb
 		d->place_object(h->get_firstN());//placing door
+		c->place_coins(h->get_firstN());
 		h->print_grid();//printing grid on terminal
 		print_statements();
 		while (true) { // Press 'q' to quit
 			int ch = getch();
-			clear();
+			if (time(0) - ctime >= t) {//reassign coins 
+				ctime = time(0);
+				refresh();
+				c->update_c(s, *k, *d, *p, *b,h->get_firstN());
+				c->place_coins(h->get_firstN());
+			}
 			h->update_grid(*p); // Update the grid based on the player's position
 			switch (ch) {
 			case KEY_UP:
@@ -513,6 +640,9 @@ public:
 			}
 			// Clear and redraw the grid with the updated player position
 			clear();
+			if (c->rem(p->get_x(), p->get_y(),h->get_firstN())==true) {
+				p->get_undo() += 1;
+			}
 			h->update_grid(*p);
 			h->print_grid();
 			print_statements();
