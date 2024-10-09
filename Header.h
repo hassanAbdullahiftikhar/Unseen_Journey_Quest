@@ -95,7 +95,21 @@ public:
 		c->c = 'P';
 	}
 };
-
+struct bomb :public object {
+	bomb* nextb;
+public:
+	bomb(int s) :object(s) {}
+	void place_object(Node*& f) {
+		Node* c = f;
+		for (int i = 0; i < x; i++) {
+			c = c->right;
+		}
+		for (int i = 0; i < y; i++) {
+			c = c->down;
+		}
+		c->c = 'B';
+	}
+};
 class key :public object {
 public:
 	key(int s) :object(s) {}
@@ -124,20 +138,6 @@ public:
 		c->c = 'D';
 	}
 };
-struct bomb :public object {
-public:
-	bomb(int s) :object(s) {}
-	void place_object(Node*& f) {
-		Node* c = f;
-		for (int i = 0; i < x; i++) {
-			c = c->right;
-		}
-		for (int i = 0; i < y; i++) {
-			c = c->down;
-		}
-		c->c = 'B';
-	}
-};
 struct coin :public object {
 	coin* nextc;
 	void unique(key k, door d, player p,bomb b, Node*& f) {
@@ -164,6 +164,57 @@ public:
 			c = c->down;
 		}
 		c->c = 'C';
+	}
+};
+class Bmob_list {
+	bomb* head;
+	int c = 0;
+	void initialize_list(int s,key k,player p) {
+		srand(time(0));
+		if (s == 10) {
+			c = 3;
+		}
+		else if(s==15) {
+			c = 4;
+		}
+		else {
+			c = 5;
+		}
+		head = new bomb(s);
+		while ((head->get_x() == k.get_x() && head->get_y() == k.get_y()) ||
+			(head->get_x() == p.get_x() && head->get_y() == p.get_y())) {
+			head->set_x(rand() % (s - 1));
+			head->set_y(rand() % (s - 1));
+		}
+
+		bomb* cu = head;
+		for (int i = 0; i < c-1; i++) {
+			cu->nextb = new bomb(s);
+			cu = cu->nextb;
+			while ((cu->get_x() == k.get_x() && cu->get_y() == k.get_y()) ||
+				(cu->get_x() == p.get_x() && cu->get_y() == p.get_y())) {
+				cu->set_x(rand() % (s - 1));
+				cu->set_y(rand() % (s - 1));
+			}
+		}
+	}
+public:
+	Bmob_list(int s,key k,player p):head(nullptr){
+		initialize_list(s,k,p);
+	}
+	void test() {
+		mvprintw(19, 0,"%d",head->get_x( )>0? head->get_x() > 0:-999);
+		mvprintw(19, 3, "%d", head->nextb->get_y() > 0 ? head->nextb->get_y() > 0:-999);
+	}
+	void populate(Node*&f) {
+		bomb* cu = head;
+		for (int i = 0; i < c; i++) {
+			if (cu == nullptr) {
+				break;
+			}
+			cu->place_object(f);
+			cu = cu->nextb;
+		}
 	}
 };
 class coin_list {
@@ -332,7 +383,11 @@ public:
 			int x = 1;
 			while (col != nullptr) {
 				attron(COLOR_PAIR(1));
+				if (col->c == 'C') {
+					attron(COLOR_PAIR(2));
+				}
 				mvprintw(y, x, "%c", col->c); // Print the character
+				attroff(COLOR_PAIR(2));
 				clrtoeol();
 				col = col->right;
 				x += 2; // Increment the x-coordinate for the next character
@@ -340,8 +395,8 @@ public:
 			y++; // Increment the y-coordinate for the next row
 			row = row->down;
 		}
-		for (int i = 0; i < 15 + 2; i++) {
-			for (int j = 0; j < 2 * 15 + 2; j++) {
+		for (int i = 0; i < s + 2; i++) {
+			for (int j = 0; j < 2 * s + 2; j++) {
 				if (i == 0 || i == s + 1) {
 					mvprintw(i, j, "#");
 				}
@@ -360,6 +415,7 @@ class game {
 	bomb* b;
 	door* d;
 	coin_list* c;
+	Bmob_list* bl;
 	int pad = 0;
 	bool hint = false, first_t = true;
 	int t, ctime;
@@ -436,7 +492,7 @@ class game {
 			}
 		}
 	}
-	void print_statements() {
+	void print_statements(Bmob_list *l) {
 		mvprintw(h->get_size() + 2, 0 + pad, "Remaining moves:");
 		mvprintw(h->get_size() + 2, 16 + pad, "%d", p->get_moves());
 		mvprintw(h->get_size() + 2, 20 + pad, "Remaining undos:");
@@ -448,7 +504,7 @@ class game {
 		location* bn = g;
 		coin* ct = c->get_head();
 		while (ct != nullptr) {
-			mvprintw(19, 0, "NAughty");
+			bl->test();
 			mvprintw(counter, 0, "%d", ct->get_x());
 			mvprintw(counter, 1, "%d", ct->get_y());
 			ct = ct->nextc;
@@ -512,17 +568,18 @@ public:
 		b = new bomb(s);
 		d = new door(s);
 		c = new coin_list(s,*k,*d,*p,*b,h->get_firstN());
+		bl = new Bmob_list(s,*k,*p);
 		t = 15;
 		ctime = time(0);
 		srand((time(0)));
 		p->place_object(h->get_firstN());//placing player
 		p->get_turn() = true;
 		k->place_object(h->get_firstN());//placing key
-		b->place_object(h->get_firstN());//placing bomb
 		d->place_object(h->get_firstN());//placing door
 		c->place_coins(h->get_firstN());
+		bl->populate(h->get_firstN());
 		h->print_grid();//printing grid on terminal
-		print_statements();
+		print_statements(bl);
 		while (true) { // Press 'q' to quit
 			int ch = getch();
 			if (time(0) - ctime >= t) {//reassign coins 
@@ -612,10 +669,10 @@ public:
 			case ' ':
 				if (p->get_undo() > 0) {
 					location* s = p->get_Pstack().t(); // Get the new top
-					if (s->next != nullptr) { // undo move
-						p->get_Pstack().pop(); // Remove the last position
+					if (s != nullptr) { // undo move
 						int nx = p->get_Pstack().t()->x;
 						int ny = p->get_Pstack().t()->y;
+						p->get_Pstack().pop(); // Remove the last position
 						p->set_x(nx);
 						p->set_y(ny);
 						p->get_undo() -= 1;
@@ -645,7 +702,7 @@ public:
 			}
 			h->update_grid(*p);
 			h->print_grid();
-			print_statements();
+			print_statements(bl);
 		}
 
 	}
