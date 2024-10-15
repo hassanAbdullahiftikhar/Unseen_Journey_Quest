@@ -138,38 +138,10 @@ public:
 		c->c = 'D';
 	}
 };
-struct coin :public object {
-	coin* nextc;
-	void unique(key k, door d, player p,bomb b, Node*& f) {
-		while ((k.get_x() == x && k.get_y() == y) || 
-			(d.get_x() == x && d.get_y()==y) ||
-			(p.get_x() == x && p.get_y()== y)||
-			(b.get_x() == x && b.get_y() == y)) {
-			x = rand() % (si - 1);
-			y = rand() % (si - 1);
-		}
-
-	}
-public:
-	coin(int s, key k, door d, player p,bomb b, Node*& f) :object(s) {
-		nextc = nullptr;
-		unique(k, d, p, b,f);
-	}
-	void place_object(Node*& f) {
-		Node* c = f;
-		for (int i = 0; i < x; i++) {
-			c = c->right;
-		}
-		for (int i = 0; i < y; i++) {
-			c = c->down;
-		}
-		c->c = 'C';
-	}
-};
 class Bmob_list {
 	bomb* head;
 	int c = 0;
-	void initialize_list(int s,key k,player p) {
+	void initialize_list(int s,key k,player p,door d) {
 		srand(time(0));
 		if (s == 10) {
 			c = 3;
@@ -192,15 +164,23 @@ class Bmob_list {
 			cu->nextb = new bomb(s);
 			cu = cu->nextb;
 			while ((cu->get_x() == k.get_x() && cu->get_y() == k.get_y()) ||
-				(cu->get_x() == p.get_x() && cu->get_y() == p.get_y())) {
+				(cu->get_x() == p.get_x() && cu->get_y() == p.get_y())||
+				(cu->get_x() == d.get_x() && cu->get_y() == d.get_y()))
+				{
 				cu->set_x(rand() % (s - 1));
 				cu->set_y(rand() % (s - 1));
 			}
 		}
 	}
 public:
-	Bmob_list(int s,key k,player p):head(nullptr){
-		initialize_list(s,k,p);
+	Bmob_list(int s,key k,player p,door d):head(nullptr){
+		initialize_list(s,k,p,d);
+	}
+	int get_bno() {
+		return c;
+	}
+	bomb *& get_head_b() {
+		return head;
 	}
 	void test() {
 		mvprintw(19, 0,"%d",head->get_x( )>0? head->get_x() > 0:-999);
@@ -217,11 +197,57 @@ public:
 		}
 	}
 };
+struct coin :public object {
+	coin* nextc;
+	void unique(key k, door d, player p,Bmob_list bl, bomb b, Node*& f) {
+		while ((k.get_x() == x && k.get_y() == y) ||
+			(d.get_x() == x && d.get_y() == y) ||
+			(p.get_x() == x && p.get_y() == y) ||
+			(b.get_x() == x && b.get_y() == y)||
+			(bomb_clash(bl)==true)) {
+			x = rand() % (si - 1);
+			y = rand() % (si - 1);
+		}
+
+	}
+public:
+	bool bomb_clash(Bmob_list l) {
+		bomb* curr = l.get_head_b();
+		if (curr != nullptr) {
+			for (int i = 0; i < l.get_bno(); i++) {
+				if (curr->get_x() == x && curr->get_y() == y) {
+					mvprintw(0 + i, 45, "True");
+					return true;
+				}
+				else {
+					mvprintw(0 + i, 50, "False");
+				}
+				curr = curr->nextb;
+			}
+		}
+		return false;
+	}
+	coin(int s, key k, door d, player p, bomb b,Bmob_list bl, Node*& f) :object(s) {
+		nextc = nullptr;
+		unique(k, d, p, bl,b, f);
+	}
+	void place_object(Node*& f) {
+		Node* c = f;
+		for (int i = 0; i < x; i++) {
+			c = c->right;
+		}
+		for (int i = 0; i < y; i++) {
+			c = c->down;
+		}
+		c->c = 'C';
+	}
+};
 class coin_list {
 	coin* h;
 	int c = 0;
 public:
-	coin_list(int s, key k, door d, player p,bomb b, Node*& f) {
+	coin_queue* cq;
+	coin_list(int s, key k, door d, player p,bomb b,Bmob_list bl, Node*& f) {
 		if (s == 10) {
 			c = 3;
 		}
@@ -229,14 +255,18 @@ public:
 			c = 5;
 		}
 		else if (s == 20) {
-			c == 6;
+			c = 6;
 		}
-		h = new coin(s,k,d,p,b,f);
+		cq = new coin_queue();
+		h = new coin(s,k,d,p,b,bl,f);
 		coin* curr = h;
 		for (int i = 1; i < c; i++) {
-			curr->nextc = new coin(s, k, d, p,b, f);
+			curr->nextc = new coin(s, k, d, p,b,bl, f);
 			curr = curr->nextc;
 		}
+	}
+	void print_coin_collection(int r) {
+		cq->print(r);
 	}
 	void rem_prev(Node*& f) {
 		Node* g = f;
@@ -280,7 +310,7 @@ public:
 		}
 		return false;
 	}
-	void update_c(int s,key k, door d, player p,bomb b, Node*& f) {
+	void update_c(int s,key k, door d, player p,Bmob_list bl,bomb b, Node*& f) {
 		coin* th = h;
 		Node* cur = f;
 		while (th != nullptr) {
@@ -296,10 +326,10 @@ public:
 			th = th->nextc;
 			delete temp;
 		}
-		h = new coin(s, k, d, p,b, f);
+		h = new coin(s, k, d, p,b,bl, f);
 		coin* curr = h;
 		for (int i = 1; i < c; i++) {
-			curr->nextc = new coin(s, k, d, p, b,f);
+			curr->nextc = new coin(s, k, d, p, b,bl,f);
 			curr = curr->nextc;
 		}
 	}
@@ -318,6 +348,7 @@ class Grid {
 	Node* t_row = nullptr;
 	int s;
 	int pad;
+	bool rev = false;
 	void initialize_grid() {
 		//setting the first col. of each row
 		Node* curr = t_row;
@@ -375,6 +406,34 @@ public:
 	Node*& get_firstN() {
 		return t_row;
 	}
+	void reveal(key*k,door*d,player *&p){
+		rev = true;
+		Node* co = t_row;
+		for (int i = 0; i < k->get_x(); i++) {
+			co = co->right;
+		}
+		for (int j = 0; j < k->get_y(); j++) {
+			co = co->down;
+		}
+		co->c = 'K';
+		co = t_row;
+		for (int i = 0; i < d->get_x(); i++) {
+			co = co->right;
+		}
+		for (int j = 0; j < d->get_y(); j++) {
+			co = co->down;
+		}
+		co->c = 'D';
+		co = t_row;
+		for (int i = 0; i < p->get_x(); i++) {
+			co = co->right;
+		}
+		for (int j = 0; j < p->get_y(); j++) {
+			co = co->down;
+		}
+		co->c = 'P';
+		print_grid();
+	}
 	void print_grid() {
 		Node* row = t_row;
 		int y = 1;
@@ -386,7 +445,15 @@ public:
 				if (col->c == 'C') {
 					attron(COLOR_PAIR(2));
 				}
-				mvprintw(y, x, "%c", col->c); // Print the character
+				else if(col->c == 'P') {
+					attron(COLOR_PAIR(3));
+				}
+				if ((col->c == 'K' || col->c == 'D') && rev == false) {
+					mvprintw(y, x, "%c", '.'); // Print the character
+				}
+				else {
+					mvprintw(y, x, "%c", col->c); // Print the character
+				}
 				attroff(COLOR_PAIR(2));
 				clrtoeol();
 				col = col->right;
@@ -416,11 +483,11 @@ class game {
 	door* d;
 	coin_list* c;
 	Bmob_list* bl;
-	int pad = 0;
+	bool game_con = true,win=false;
 	bool hint = false, first_t = true;
 	int t, ctime;
 	int curr_d;
-	int cal_d() {
+	int cal_d() {//calculating total no of moves at satrt of game
 		int e = 0, c = 0;
 		e += k->get_x() - d->get_x();
 		if (e < 0) {
@@ -493,36 +560,25 @@ class game {
 		}
 	}
 	void print_statements(Bmob_list *l) {
-		mvprintw(h->get_size() + 2, 0 + pad, "Remaining moves:");
-		mvprintw(h->get_size() + 2, 16 + pad, "%d", p->get_moves());
-		mvprintw(h->get_size() + 2, 20 + pad, "Remaining undos:");
-		mvprintw(h->get_size() + 2, 37 + pad, "%d", p->get_undo());
-		mvprintw(h->get_size() + 2 + pad, 40, "Score:");
-		mvprintw(h->get_size() + 2 + pad, 46, "%d", p->get_score());
-		int counter = 20;
-		location *g = p->get_Pstack().t();
-		location* bn = g;
-		coin* ct = c->get_head();
-		while (ct != nullptr) {
-			bl->test();
-			mvprintw(counter, 0, "%d", ct->get_x());
-			mvprintw(counter, 1, "%d", ct->get_y());
-			ct = ct->nextc;
-			counter++;
-			//refresh();
-		}
+		mvprintw(h->get_size() + 2, 0 , "Remaining moves");
+		mvprintw(h->get_size() + 2, 16, "%d", p->get_moves());
+		mvprintw(h->get_size() + 2, 20, "Remaining undos:");
+		mvprintw(h->get_size() + 2, 37, "%d", p->get_undo());
+		mvprintw(h->get_size() + 2, 40, "Score:");
+		mvprintw(h->get_size() + 2, 46, "%d", p->get_score());
+		int counter = 50;
 		if (p->get_key() == false) {
-			mvprintw(h->get_size() + 3, 0 + pad, "Key Status: False");
+			mvprintw(h->get_size() + 3, 0, "Key Status: False");
 		}
 		else {
-			mvprintw(h->get_size() + 3, 0 + pad, "Key Status: True");
+			mvprintw(h->get_size() + 3, 0, "Key Status: True");
 		}
 		if (first_t == false) {
 			if (hint == true) {
-				mvprintw(h->get_size() + 4, 1 + pad, "Hint:Getting closer");
+				mvprintw(h->get_size() + 4, 1, "Hint:Getting closer");
 			}
 			else {
-				mvprintw(h->get_size() + 4, 1 + pad, "Hint:Getting Farther");
+				mvprintw(h->get_size() + 4, 1, "Hint:Getting Farther");
 			}
 		}
 	}
@@ -539,12 +595,15 @@ public:
 		}
 		return false;
 	}
-	bool check_bomb() {//checking if player placement matches bomb placement
-		int x1, x2, y1, y2;
-		x1 = p->get_x(), y1 = p->get_y();
-		x2 = b->get_x(), y2 = b->get_y();
-		if (x1 == x2 && y1 == y2) {
-			return true;
+	bool check_bomb(Bmob_list*bl,int x,int y ) {//checking if player placement matches bomb placement
+		int x1, y1;
+		bomb* curr = bl->get_head_b();
+		for (int i = 0;i<bl->get_bno();i++) {
+			x1 = curr->get_x(), y1 = curr->get_y();
+			if (x1 == x && y1 == y) {
+				return true;
+			}
+			curr = curr->nextb;
 		}
 		return false;
 	}
@@ -567,8 +626,10 @@ public:
 		k = new key(s);
 		b = new bomb(s);
 		d = new door(s);
-		c = new coin_list(s,*k,*d,*p,*b,h->get_firstN());
-		bl = new Bmob_list(s,*k,*p);
+		bl = new Bmob_list(s,*k,*p,*d);
+		c = new coin_list(s,*k,*d,*p,*b,*bl,h->get_firstN());
+		int xini = p->get_x();
+		int yini = p->get_y();
 		t = 15;
 		ctime = time(0);
 		srand((time(0)));
@@ -581,129 +642,162 @@ public:
 		h->print_grid();//printing grid on terminal
 		print_statements(bl);
 		while (true) { // Press 'q' to quit
-			int ch = getch();
-			if (time(0) - ctime >= t) {//reassign coins 
-				ctime = time(0);
-				refresh();
-				c->update_c(s, *k, *d, *p, *b,h->get_firstN());
-				c->place_coins(h->get_firstN());
+			if (game_con == true) {
+				int ch = getch();
+				if (time(0) - ctime >= t) {//reassign coins 
+					ctime = time(0);
+					refresh();
+					c->update_c(s, *k, *d, *p, *bl, *b, h->get_firstN());
+					c->place_coins(h->get_firstN());
+				}
+				h->update_grid(*p); // Update the grid based on the player's position
+				switch (ch) {
+				case KEY_UP:
+					if (p->get_y() > 0) {
+						int xp1 = -99, xp2 = -99;
+						if (p->get_Pstack().t() != nullptr) {
+							xp1 = p->get_Pstack().t()->x;
+							xp2 = p->get_Pstack().t()->y;
+						}
+						if (!(xp1 == p->get_x() && xp2 == p->get_y() - 1)) {
+							p->set_y(p->get_y() - 1); // Move up
+							p->get_Pstack().insert(p->get_x(), p->get_y() + 1);
+							first_t = false;
+							cal_manhattan();
+							p->get_moves() -= 1;
+						}
+						break;
+					}
+					else {
+						break;
+					}
+				case KEY_DOWN:
+					if (p->get_y() < s - 1) {
+						int xp1 = -99, xp2 = -99;
+						if (p->get_Pstack().t() != nullptr) {
+							xp1 = p->get_Pstack().t()->x;
+							xp2 = p->get_Pstack().t()->y;
+						}
+						if (!(xp1 == p->get_x() && xp2 == p->get_y() + 1)) {
+							p->set_y(p->get_y() + 1);// Move down
+							p->get_Pstack().insert(p->get_x(), p->get_y() - 1);
+							first_t = false;
+							cal_manhattan();
+							p->get_moves() -= 1;
+						}
+						break;
+					}
+					else {
+						break;
+					}
+				case KEY_LEFT:
+					if (p->get_x() > 0) {
+						int xp1 = -99, xp2 = -99;
+						if (p->get_Pstack().t() != nullptr) {
+							xp1 = p->get_Pstack().t()->x;
+							xp2 = p->get_Pstack().t()->y;
+						}
+						if (!(xp1 == p->get_x() - 1 && xp2 == p->get_y())) {
+							p->set_x(p->get_x() - 1); // Move left
+							p->get_Pstack().insert(p->get_x() + 1, p->get_y());
+							first_t = false;
+							cal_manhattan();
+							p->get_moves() -= 1;
+						}
+						break;
+					}
+					else {
+						break;
+					}
+				case KEY_RIGHT:
+					if (p->get_x() < s - 1) {
+						int xp1 = -99, xp2 = -99;
+						if (p->get_Pstack().t() != nullptr) {
+							xp1 = p->get_Pstack().t()->x;
+							xp2 = p->get_Pstack().t()->y;
+						}
+						if (!(xp1 == p->get_x() + 1 && xp2 == p->get_y())) {
+							p->set_x(p->get_x() + 1); // Move right
+							p->get_Pstack().insert(p->get_x() - 1, p->get_y());
+							first_t = false;
+							cal_manhattan();
+							p->get_moves() -= 1;
+						}
+						break;
+					}
+					else {
+						break;
+					}
+				case ' ':
+					if (p->get_undo() > 0) {
+						location* s = p->get_Pstack().t(); // Get the new top
+						if (s != nullptr) { // undo move
+							int nx = p->get_Pstack().t()->x;
+							int ny = p->get_Pstack().t()->y;
+							p->get_Pstack().pop(); // Remove the last position
+							p->set_x(nx);
+							p->set_y(ny);
+							p->get_undo() -= 1;
+							cal_manhattan();
+						}
+						break;
+					}
+				}
+				if (p->get_moves() <= 0) {
+					win = false;
+					game_con = false;
+				}
+				if (check_key()) {
+					cout << "Key picked";
+				}
+				if (check_door()) {
+					game_con = false;
+					win = true;
+				}
+				// Clear and redraw the grid with the updated player position
+				clear();
+				if (c->rem(p->get_x(), p->get_y(), h->get_firstN()) == true) {//check coins
+					p->get_score() += 1;
+					p->get_undo() += 1;
+					c->cq->enque(p->get_x(), p->get_y());
+				}
+				if (check_bomb(bl, p->get_x(), p->get_y())) {
+					game_con = false;
+				}
+				h->update_grid(*p);
+				h->print_grid();
+				print_statements(bl);
 			}
-			h->update_grid(*p); // Update the grid based on the player's position
-			switch (ch) {
-			case KEY_UP:
-				if (p->get_y() > 0) {
-					int xp1 = -99, xp2 = -99;
-					if (p->get_Pstack().t() != nullptr) {
-						xp1 = p->get_Pstack().t()->x;
-						xp2 = p->get_Pstack().t()->y;
-					}
-					if (!(xp1 == p->get_x() && xp2 == p->get_y() - 1)) {
-						p->set_y(p->get_y() - 1); // Move up
-						p->get_Pstack().insert(p->get_x(), p->get_y()+1);
-						first_t = false;
-						cal_manhattan();
-						p->get_moves() -= 1;
-					}
-					break;
+			else {
+				clear();
+				Node* c = h->get_firstN();
+				for (int i = 0; i < p->get_x(); i++) {
+					c = c->right;
 				}
-				else {
-					break;
+				for (int i = 0; i < p->get_y(); i++) {
+					c = c->down;
 				}
-			case KEY_DOWN:
-				if (p->get_y() < s - 1) {
-					int xp1 = -99, xp2 = -99;
-					if (p->get_Pstack().t() != nullptr) {
-						xp1 = p->get_Pstack().t()->x;
-						xp2 = p->get_Pstack().t()->y;
-					}
-					if (!(xp1 == p->get_x() && xp2 == p->get_y() + 1)) {
-						p->set_y(p->get_y() + 1);// Move down
-						p->get_Pstack().insert(p->get_x(), p->get_y()-1);
-						first_t = false;
-						cal_manhattan();
-						p->get_moves() -= 1;
-					}
-					break;
-				}
-				else {
-					break;
-				}
-			case KEY_LEFT:
-				if (p->get_x() > 0) {
-					int xp1 = -99, xp2 = -99;
-					if (p->get_Pstack().t() != nullptr) {
-						xp1 = p->get_Pstack().t()->x;
-						xp2 = p->get_Pstack().t()->y;
-					}
-					if (!(xp1 == p->get_x() - 1 && xp2 == p->get_y())) {
-						p->set_x(p->get_x() - 1); // Move left
-						p->get_Pstack().insert(p->get_x()+1, p->get_y());
-						first_t = false;
-						cal_manhattan();
-						p->get_moves() -= 1;
-					}
-					break;
-				}
-				else {
-					break;
-				}
-			case KEY_RIGHT:
-				if (p->get_x() < s - 1) {
-					int xp1 = -99, xp2 = -99;
-					if (p->get_Pstack().t() != nullptr) {
-						xp1 = p->get_Pstack().t()->x;
-						xp2 = p->get_Pstack().t()->y;
-					}
-					if (!(xp1 == p->get_x() + 1 && xp2 == p->get_y())) {
-						p->set_x(p->get_x() + 1); // Move right
-						p->get_Pstack().insert(p->get_x()-1, p->get_y());
-						first_t = false;
-						cal_manhattan();
-						p->get_moves() -= 1;
-					}
-					break;
-				}
-				else {
-					break;
-				}
-			case ' ':
-				if (p->get_undo() > 0) {
-					location* s = p->get_Pstack().t(); // Get the new top
-					if (s != nullptr) { // undo move
-						int nx = p->get_Pstack().t()->x;
-						int ny = p->get_Pstack().t()->y;
-						p->get_Pstack().pop(); // Remove the last position
-						p->set_x(nx);
-						p->set_y(ny);
-						p->get_undo() -= 1;
-						cal_manhattan();
-					}
-					break;
-				}
-			}
-			/*if (p->get_moves() <= 0) {
+				c->c = '.';
+				p->set_x(xini);
+				p->set_y(yini);
 				break;
-			}*/
-			if (check_bomb()) {
-				break;
 			}
-			if (check_key()) {
-				delete k;
-				cout << "Key picked";
-			}
-			if (check_door()) {
-				cout << "You won!!";
-				break;
-			}
-			// Clear and redraw the grid with the updated player position
-			clear();
-			if (c->rem(p->get_x(), p->get_y(),h->get_firstN())==true) {
-				p->get_undo() += 1;
-			}
-			h->update_grid(*p);
-			h->print_grid();
-			print_statements(bl);
 		}
-
+		p->get_score() += p->get_moves();
+		p->get_score() += p->get_undo();
+		if (win) {
+			mvprintw(h->get_size() + 2, 0,"Game Won!!");
+			mvprintw(h->get_size() + 2, 10, "Score:");
+			mvprintw(h->get_size() + 2, 16,"%d",p->get_score() );
+		}
+		else {
+			mvprintw(h->get_size() + 2, 0, "Game Lost!!");
+			mvprintw(h->get_size() + 2, 10, "Score:");
+			mvprintw(h->get_size() + 2, 16, "%d", p->get_score());
+		}
+		c->print_coin_collection(h->get_size());
+		h->reveal(k, d,p);
+		while (true) {
+		}
 	}
 };
