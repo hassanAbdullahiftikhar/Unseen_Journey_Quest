@@ -216,11 +216,7 @@ public:
 		if (curr != nullptr) {
 			for (int i = 0; i < l.get_bno(); i++) {
 				if (curr->get_x() == x && curr->get_y() == y) {
-					mvprintw(0 + i, 45, "True");
 					return true;
-				}
-				else {
-					mvprintw(0 + i, 50, "False");
 				}
 				curr = curr->nextb;
 			}
@@ -448,13 +444,15 @@ public:
 				else if(col->c == 'P') {
 					attron(COLOR_PAIR(3));
 				}
+				else if (col->c == 'B') {
+					attron(COLOR_PAIR(4));
+				}
 				if ((col->c == 'K' || col->c == 'D') && rev == false) {
 					mvprintw(y, x, "%c", '.'); // Print the character
 				}
 				else {
 					mvprintw(y, x, "%c", col->c); // Print the character
 				}
-				attroff(COLOR_PAIR(2));
 				clrtoeol();
 				col = col->right;
 				x += 2; // Increment the x-coordinate for the next character
@@ -641,7 +639,7 @@ public:
 		bl->populate(h->get_firstN());
 		h->print_grid();//printing grid on terminal
 		print_statements(bl);
-		while (true) { // Press 'q' to quit
+		while (true) { 
 			if (game_con == true) {
 				int ch = getch();
 				if (time(0) - ctime >= t) {//reassign coins 
@@ -784,7 +782,6 @@ public:
 			}
 		}
 		p->get_score() += p->get_moves();
-		p->get_score() += p->get_undo();
 		if (win) {
 			mvprintw(h->get_size() + 2, 0,"Game Won!!");
 			mvprintw(h->get_size() + 2, 10, "Score:");
